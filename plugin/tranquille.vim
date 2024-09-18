@@ -11,14 +11,11 @@ let g:loaded_tranquille = 1
 let s:save_cpo = &cpoptions
 set cpoptions&vim
 
-if mapcheck('g/') ==# '' && !hasmapto('<Plug>(tranquille_search)')
-    nmap <unique> g/ <Plug>(tranquille_search)
-endif
+nnoremap <silent> <Plug>(tranquille_search_pattern) :TranquilleSearch pattern<CR>
+nnoremap <silent> <Plug>(tranquille_search_word) :TranquilleSearch word<CR>
 
-nnoremap <silent> <Plug>(tranquille_search) :TranquilleSearch<CR>
-
-command! -nargs=0 TranquilleSearch
-            \ let result = <SID>tranquille_search()
+command! -nargs=1 TranquilleSearch
+            \ let result = <SID>tranquille_search(<f-args>)
             \ | if result
                 \ | set hls
                 \ | endif
@@ -37,25 +34,40 @@ fun! s:delete_match() abort
     endtry
 endfun
 
-fun! s:tranquille_search()
+fun! s:get_searchtxt(mode)
+    augroup tranquille_textwatcher
+        autocmd!
+        autocmd CmdlineChanged * call s:update_hl(getcmdline())
+    augroup END
+    
+    let l:search = ''
+    
+    if a:mode ==# 'pattern'
+        let l:search = input('/')
+    else
+        let l:search = expand('<cword>')
+    endif
+
+    augroup tranquille_textwatcher
+        autocmd!
+    augroup END
+
+    return l:search
+endfun
+
+fun! s:tranquille_search(mode)
     nohls
-    augroup tranquille_textwatcher
-        autocmd!
-        autocmd CmdlineChanged * call s:update_hl()
-    augroup END
-    let search = input('/')
-    augroup tranquille_textwatcher
-        autocmd!
-    augroup END
-    if search !=# ''
-        let @/ = search
+
+    let l:txt = s:get_searchtxt(a:mode)
+    if l:txt !=# ''
+        let @/ = l:txt
         redraw
         try
-            if search(search, 'n') == 0
-                echohl ErrorMsg | echo 'E486: Pattern not found: '.search | echohl None
+            if search(l:txt, 'n') == 0
+                echohl ErrorMsg | echo 'E486: Pattern not found: '.l:txt | echohl None
             endif
         catch /.*/
-            echohl ErrorMsg | echom 'Error with search term: '.search | echohl None
+            echohl ErrorMsg | echom 'Error with search term: '.l:txt | echohl None
         endtry
         return 1
     else
@@ -63,7 +75,7 @@ fun! s:tranquille_search()
     endif
 endf
 
-fun! s:update_hl() abort
+fun! s:update_hl(txt) abort
     call s:delete_match()
 
     let l:pattern = ''
@@ -73,9 +85,9 @@ fun! s:update_hl() abort
     if &ignorecase
         let l:pattern .= '\c'
     endif
-    let l:cmdline = getcmdline()
-    if l:cmdline !=# ''
-        let l:pattern .= l:cmdline
+
+    if a:txt !=# ''
+        let l:pattern .= a:txt
         try
             call matchadd('Search', l:pattern, 0, s:tranquille_id)
         catch /.*/
