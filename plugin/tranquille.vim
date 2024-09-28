@@ -43,7 +43,12 @@ fun! s:get_searchtxt(mode)
     let l:search = ''
     
     if a:mode ==# 'pattern'
-        let l:search = input('/')
+        if mode() ==# 'v' || mode() ==# 'V' || mode() ==# "\<C-v>"
+            normal! "vy
+            let l:search = '\V' . join(split(getreg('v'), '\n'), '\n')
+        else
+            let l:search = input('/')
+        endif
     else
         let l:search = expand('<cword>')
     endif
